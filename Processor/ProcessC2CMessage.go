@@ -277,6 +277,10 @@ func (p *Processors) ProcessC2CMessage(data *dto.WSC2CMessageData) error {
 			if CaN != "" {
 				groupMsg.Sender.Nickname = CaN
 				groupMsg.Sender.Card = CaN
+			} else if data.Author.Username != "" {
+				// [修复] 官方 username 作为默认昵称
+				groupMsg.Sender.Nickname = data.Author.Username
+				groupMsg.Sender.Card = data.Author.Username
 			}
 			// 根据条件判断是否添加Echo字段
 			if config.GetTwoWayEcho() {
@@ -414,6 +418,10 @@ func (p *Processors) ProcessC2CMessage(data *dto.WSC2CMessageData) error {
 			if CaN != "" {
 				groupMsg.Sender.Nickname = CaN
 				groupMsg.Sender.Card = CaN
+			} else if data.Author.Username != "" {
+				// [修复] 官方 username 作为默认昵称
+				groupMsg.Sender.Nickname = data.Author.Username
+				groupMsg.Sender.Card = data.Author.Username
 			}
 
 			// 根据条件判断是否添加Echo字段
