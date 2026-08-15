@@ -1,6 +1,6 @@
 
 
-> ##  本 Fork 为个人自用修改版
+> ##  本 Fork 为针对[Sparkbridge-群服互通机器人](https://sparkbridge.cn)使用场景魔改开发版本
 >
 > 基于 [hoshinonyaruko/gensokyo](https://github.com/hoshinonyaruko/gensokyo) 上游分支，为满足群服互通场景需求，在官方代码基础上增加了以下修改（**未合并回官方，基本vibe加小测试，代码可靠性未知，请勿向官方提 PR**）：
 >
