@@ -4,6 +4,36 @@
   </a>
 </p>
 
+> ## ⚠️ 本 Fork 为个人自用修改版
+>
+> 基于 [hoshinonyaruko/gensokyo](https://github.com/hoshinonyaruko/gensokyo) 上游分支，为满足群服互通场景需求，在官方代码基础上增加了以下修改（**未合并回官方，请勿向官方提 PR**）：
+>
+> ### 新增能力
+> 1. **群全量消息接收**（`GROUP_MESSAGE_CREATE`）
+>    - 订阅后机器人可收到群里每条消息（不要求 @bot）
+>    - 与 `GroupATMessageEventHandler`（@消息）可同时开启，内部按消息 ID 去重
+> 2. **主动消息发送**（无 `msg_id` 直接发送）
+>    - 配置 `allow_proactive_msg: true` 后，无被动窗口时也直接发送
+>    - 需官方主动消息权限（否则报 `40034105 主动消息失败, 无权限`）
+> 3. **`require_mention` 群消息响应开关**
+>    - `false`（默认）= 全量消息都响应；`true` = 仅响应 @bot 消息
+>    - 仅对全量事件生效，@ 事件不受影响
+>
+> ### 配置说明
+> ```yaml
+> text_intent:
+>   - "GroupMessageEventHandler"      # 群全量消息（需官方开放权限）
+>   - "GroupATMessageEventHandler"    # 群@消息
+>   - "C2CMessageEventHandler"        # 群私聊
+> allow_proactive_msg: true           # 允许主动消息
+> require_mention: false              # false=全量响应, true=仅@响应
+> ```
+>
+> ### 修复
+> - `ProcessGroupMessage` 类型转换问题：兼容 `WSGroupMessageData`（全量）与 `WSGroupATMessageData`（@）两种事件，避免下游 type switch 匹配失败导致消息被误拦
+>
+> ---
+
 <div align="center">
 
 # gensokyo
