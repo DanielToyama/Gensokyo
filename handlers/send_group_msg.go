@@ -224,17 +224,22 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 		mylog.Println("群组发信息messageText:", messageText)
 		//mylog.Println("foundItems:", foundItems)
 		if messageID == "" {
-			// 检查 UserID 是否为 nil
-			if message.Params.UserID != nil && message.Params.UserID.(string) != "" && message.Params.UserID.(string) != "0" {
-				messageID = GetMessageIDByUseridAndGroupid(config.GetAppIDStr(), message.Params.UserID, message.Params.GroupID)
-				mylog.Println("通过GetMessageIDByUseridAndGroupid函数获取的message_id:", message.Params.GroupID, messageID)
+			// 主动消息模式: 无可用被动 msg_id 时, 保持为空直接发送(官方API支持无msg_id的主动消息)
+			if config.GetAllowProactiveMsg() {
+				mylog.Println("主动消息模式: 无 msg_id 缓存, 将作为主动消息直接发送(不携带msg_id)")
 			} else {
-				// 如果 UserID 是 nil，可以在这里处理，例如记录日志或采取其他措施
-				mylog.Println("UserID 为 nil,跳过 GetMessageIDByUseridAndGroupid 调用")
+				// 检查 UserID 是否为 nil
+				if message.Params.UserID != nil && message.Params.UserID.(string) != "" && message.Params.UserID.(string) != "0" {
+					messageID = GetMessageIDByUseridAndGroupid(config.GetAppIDStr(), message.Params.UserID, message.Params.GroupID)
+					mylog.Println("通过GetMessageIDByUseridAndGroupid函数获取的message_id:", message.Params.GroupID, messageID)
+				} else {
+					// 如果 UserID 是 nil，可以在这里处理，例如记录日志或采取其他措施
+					mylog.Println("UserID 为 nil,跳过 GetMessageIDByUseridAndGroupid 调用")
+				}
 			}
 		}
-		// 如果messageID为空，通过函数获取
-		if messageID == "" {
+		// 如果messageID为空, 且未启用主动消息模式, 通过函数获取
+		if messageID == "" && !config.GetAllowProactiveMsg() {
 			messageID = GetMessageIDByUseridOrGroupid(config.GetAppIDStr(), message.Params.GroupID)
 			mylog.Println("通过GetMessageIDByUseridOrGroupid函数获取的message_id:", message.Params.GroupID, messageID)
 		}

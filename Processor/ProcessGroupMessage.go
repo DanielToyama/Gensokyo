@@ -20,7 +20,12 @@ import (
 )
 
 // ProcessGroupMessage 处理群组消息
-func (p *Processors) ProcessGroupMessage(data *dto.WSGroupATMessageData) error {
+// 参数用底层类型 *dto.Message，兼容 WSGroupATMessageData(@) 与 WSGroupMessageData(全量) 两种事件
+// isAtEvent=true 表示来自 GROUP_AT_MESSAGE_CREATE(@事件，本身即代表被@，无需require_mention检测)
+func (p *Processors) ProcessGroupMessage(data *dto.Message, isAtEvent ...bool) error {
+	// 转回具体类型供下游函数使用：下游多数函数按 *dto.WSGroupATMessageData 做 type switch，
+	// 传 *dto.Message 会走 default 分支导致消息被误判为空/拦截。底层类型相同，可直接转换。
+	atData := (*dto.WSGroupATMessageData)(data)
 	// 获取s
 	s := client.GetGlobalS()
 
@@ -40,6 +45,18 @@ func (p *Processors) ProcessGroupMessage(data *dto.WSGroupATMessageData) error {
 	if data.Author.ID == "" {
 		mylog.Printf("出现ID为空未知错误.%v\n", data)
 		return nil
+	}
+
+	// [新增] require_mention 开关: 开启时仅处理 @bot 的群消息
+	// 仅对全量事件(非isAtEvent)生效; @事件本身即代表被@, 无需检测
+	if config.GetRequireMention() && !(len(isAtEvent) > 0 && isAtEvent[0]) {
+		appidStr := strconv.FormatUint(p.Settings.AppID, 10)
+		mentionMark1 := "<@!" + appidStr + ">"
+		mentionMark2 := "<@" + appidStr + ">"
+		if !strings.Contains(data.Content, mentionMark1) && !strings.Contains(data.Content, mentionMark2) {
+			mylog.Printf("[require_mention] 未@机器人, 跳过消息: %s", data.Content)
+			return nil
+		}
 	}
 
 	// 改变之前先存
@@ -96,14 +113,14 @@ func (p *Processors) ProcessGroupMessage(data *dto.WSGroupATMessageData) error {
 	//当屏蔽错误通道时候=性能模式 不解析at 不解析图片
 	if !GetDisableErrorChan {
 		// 转换at
-		messageText = handlers.RevertTransformedText(data, "group", p.Api, p.Apiv2, GroupID64, userid64, config.GetWhiteEnable(4))
+		messageText = handlers.RevertTransformedText(atData, "group", p.Api, p.Apiv2, GroupID64, userid64, config.GetWhiteEnable(4))
 		if messageText == "" {
 			mylog.Printf("信息被自定义黑白名单拦截")
 			return nil
 		}
 
 		//框架内指令
-		p.HandleFrameworkCommand(messageText, data, "group")
+		p.HandleFrameworkCommand(messageText, atData, "group")
 	} else {
 		// 减少无用的性能开支
 		messageText = data.Content
@@ -152,14 +169,14 @@ func (p *Processors) ProcessGroupMessage(data *dto.WSGroupATMessageData) error {
 
 	if config.GetAutoBind() {
 		if len(data.Attachments) > 0 && data.Attachments[0].URL != "" {
-			p.Autobind(data)
+			p.Autobind(atData)
 		}
 	}
 
 	// 如果在Array模式下, 则处理Message为Segment格式
 	var segmentedMessages interface{} = messageText
 	if config.GetArrayValue() {
-		segmentedMessages = handlers.ConvertToSegmentedMessage(data)
+		segmentedMessages = handlers.ConvertToSegmentedMessage(atData)
 	}
 
 	var IsBindedUserId, IsBindedGroupId bool
@@ -352,10 +369,10 @@ func (p *Processors) ProcessGroupMessage(data *dto.WSGroupATMessageData) error {
 	// 如果不是性能模式
 	if !GetDisableErrorChan {
 		//上报信息到onebotv11应用端(正反ws) 并等待返回
-		go p.BroadcastMessageToAll(groupMsgMap, p.Apiv2, data)
+		go p.BroadcastMessageToAll(groupMsgMap, p.Apiv2, atData)
 	} else {
 		// FAF式
-		go p.BroadcastMessageToAllFAF(groupMsgMap, p.Apiv2, data)
+		go p.BroadcastMessageToAllFAF(groupMsgMap, p.Apiv2, atData)
 	}
 
 	return nil

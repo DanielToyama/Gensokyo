@@ -156,6 +156,8 @@ type Settings struct {
 	EntersAsBlock    bool   `yaml:"enters_as_block"`
 	//发送行为修改
 	LazyMessageId     bool   `yaml:"lazy_message_id"`
+	AllowProactiveMsg bool   `yaml:"allow_proactive_msg"` // [新增] 允许主动消息(无msg_id直接发送)
+	RequireMention    bool   `yaml:"require_mention"`     // [新增] 群消息是否要求@bot才响应(默认false=全量响应)
 	RamDomSeq         bool   `yaml:"ramdom_seq"`
 	BotForumTitle     string `yaml:"bot_forum_title"`
 	AtoPCount         int    `yaml:"AMsgRetryAsPMsg_Count"`

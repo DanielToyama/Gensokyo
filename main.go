@@ -761,7 +761,29 @@ func ThreadEventHandler() event.ThreadEventHandler {
 // GroupATMessageEventHandler 实现处理 群at 消息的回调
 func GroupATMessageEventHandler() event.GroupATMessageEventHandler {
 	return func(event *dto.WSPayload, data *dto.WSGroupATMessageData) error {
-		go p.ProcessGroupMessage(data)
+		go p.ProcessGroupMessage((*dto.Message)(data), true) // @事件: 跳过require_mention检测
+
+		if !config.GetDisableErrorChan() {
+			botstats.RecordMessageReceived()
+		}
+
+		if config.GetEnableChangeWord() {
+			data.Content = acnode.CheckWordIN(data.Content)
+			if data.Author.Username != "" {
+				data.Author.Username = acnode.CheckWordIN(data.Author.Username)
+			}
+		}
+
+		return nil
+	}
+}
+
+// GroupMessageEventHandler 实现处理 群全量消息 的回调 (GROUP_MESSAGE_CREATE, 不要求@)
+// 注意：全量模式下与 GROUP_AT_MESSAGE_CREATE 可能收到同一条消息（@时两条都到），
+// botgo 层按 data.ID 去重，重复消息不会进入 ProcessGroupMessage。
+func GroupMessageEventHandler() event.GroupMessageEventHandler {
+	return func(event *dto.WSPayload, data *dto.WSGroupMessageData) error {
+		go p.ProcessGroupMessage((*dto.Message)(data), false) // 全量事件: 按require_mention检测
 
 		if !config.GetDisableErrorChan() {
 			botstats.RecordMessageReceived()
@@ -887,6 +909,8 @@ func getHandlerByName(handlerName string) (interface{}, bool) {
 		return ThreadEventHandler(), true
 	case "GroupATMessageEventHandler": //群at信息
 		return GroupATMessageEventHandler(), true
+	case "GroupMessageEventHandler": //群全量信息(新增,不要求@)
+		return GroupMessageEventHandler(), true
 	case "C2CMessageEventHandler": //群私聊
 		return C2CMessageEventHandler(), true
 	case "GroupAddRobotEventHandler": //群添加机器人

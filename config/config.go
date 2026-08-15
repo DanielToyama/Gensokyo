@@ -750,6 +750,30 @@ func GetLazyMessageId() bool {
 	return instance.Settings.LazyMessageId
 }
 
+// 获取AllowProactiveMsg状态 (是否允许主动消息, 无msg_id直接发送)
+func GetAllowProactiveMsg() bool {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	if instance == nil {
+		fmt.Println("Warning: instance is nil when trying to get AllowProactiveMsg value.")
+		return false
+	}
+	return instance.Settings.AllowProactiveMsg
+}
+
+// 获取RequireMention状态 (群消息是否要求@bot才响应, 默认false=全量响应)
+func GetRequireMention() bool {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	if instance == nil {
+		fmt.Println("Warning: instance is nil when trying to get RequireMention value.")
+		return false
+	}
+	return instance.Settings.RequireMention
+}
+
 // 获取HashID
 func GetHashIDValue() bool {
 	mu.RLock()

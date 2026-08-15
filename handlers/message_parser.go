@@ -1064,6 +1064,8 @@ func RevertTransformedText(data interface{}, msgtype string, api openapi.OpenAPI
 	var menumsg bool
 	var messageText string
 	switch v := data.(type) {
+	case *dto.Message:
+		msg = v
 	case *dto.WSGroupATMessageData:
 		msg = (*dto.Message)(v)
 	case *dto.WSATMessageData:
@@ -1591,6 +1593,8 @@ func SendMessage(messageText string, data interface{}, messageType string, api o
 	// 强制类型转换，获取Message结构
 	var msg *dto.Message
 	switch v := data.(type) {
+	case *dto.Message:
+		msg = v
 	case *dto.WSGroupATMessageData:
 		msg = (*dto.Message)(v)
 	case *dto.WSATMessageData:

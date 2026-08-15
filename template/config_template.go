@@ -32,6 +32,7 @@ settings:
     # - "CreateMessageHandler"                       # 频道不at信息 私域机器人需要开启 公域机器人开启会连接失败
     # - "InteractionHandler"                         # 添加频道互动回应 卡片按钮data回调事件
     # - "GroupATMessageEventHandler"                 # 群at信息 仅频道机器人时候需要注释
+    # - "GroupMessageEventHandler"                   # 群全量消息(不要求@) 需官方开放全量权限,与GroupATMessageEventHandler可同时开启(内部按消息ID去重)
     # - "C2CMessageEventHandler"                     # 群私聊 仅频道机器人时候需要注释
     # - "ThreadEventHandler"                         # 频道发帖事件 仅频道私域机器人可用
     # - "FriendAddEventHandler"                      # 用户添加机器人(成为好友)
@@ -200,6 +201,8 @@ settings:
 
   #发送行为修改
   lazy_message_id : false           #false=message_id 条条准确对应 true=message_id 按时间范围随机对应(适合主动推送bot)前提,有足够多的活跃信息刷新id池
+  allow_proactive_msg : false       #允许主动消息: 无被动msg_id缓存时直接发送(官方API支持无msg_id的主动消息),默认false=沿用被动窗口/AtoP逻辑
+  require_mention : false           #群消息是否要求@bot才响应: false=全量消息都响应(需在text_intent开启GroupMessageEventHandler), true=仅响应@bot
   ramdom_seq : false                #当多开gensokyo时,如果遇到群信息只能发出一条,请开启每个gsk的此项.(建议使用一个gsk连接多个应用)
   bot_forum_title : "机器人帖子"                      # 机器人发帖子回复默认标题 
   AMsgRetryAsPMsg_Count : 30        #当主动信息发送失败时,自动转为后续的被动信息发送,需要开启Lazy message id,该配置项为所有群、频道的主动转被动消息队列最大长度,建议30-100,无上限
