@@ -143,16 +143,9 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          body: |
-            SparkBridge3 自用 Gensokyo fork 自动构建。
-
-            包含修改：
-            - 群全量消息接收（GROUP_MESSAGE_CREATE）
-            - 主动消息发送（allow_proactive_msg）
-            - require_mention 群响应开关
-            - 官方 username 回填 Sender.nickname
+          # 自动根据本次 tag 范围内的 commit 生成 release notes，无需手动维护修改说明
+          generate_release_notes: true
           files: |
             output/gensokyo-*
-          generate_release_notes: false
           draft: false
           prerelease: false
