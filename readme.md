@@ -1,12 +1,8 @@
-<p align="center">
-  <a href="https://www.github.com/hoshinonyaruko/gensokyo">
-    <img src="images/head.gif" width="200" height="200" alt="gensokyo">
-  </a>
-</p>
 
-> ## ⚠️ 本 Fork 为个人自用修改版
+
+> ##  本 Fork 为个人自用修改版
 >
-> 基于 [hoshinonyaruko/gensokyo](https://github.com/hoshinonyaruko/gensokyo) 上游分支，为满足群服互通场景需求，在官方代码基础上增加了以下修改（**未合并回官方，请勿向官方提 PR**）：
+> 基于 [hoshinonyaruko/gensokyo](https://github.com/hoshinonyaruko/gensokyo) 上游分支，为满足群服互通场景需求，在官方代码基础上增加了以下修改（**未合并回官方，基本vibe加小测试，代码可靠性未知，请勿向官方提 PR**）：
 >
 > ### 新增能力
 > 1. **群全量消息接收**（`GROUP_MESSAGE_CREATE`）
@@ -34,14 +30,18 @@
 >
 > ---
 
+<p align="center">
+  <a href="https://www.github.com/hoshinonyaruko/gensokyo">
+    <img src="images/head.gif" width="200" height="200" alt="gensokyo">
+  </a>
+</p>
+</div>
 <div align="center">
 
 # gensokyo
 
 _✨ 基于 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.md) QQ官方机器人Api Golang 原生实现 ✨_  
 
-
-</div>
 
 <p align="center">
   <a href="https://raw.githubusercontent.com/hoshinonyaruko/gensokyo/main/LICENSE">
