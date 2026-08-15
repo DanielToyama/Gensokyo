@@ -27,6 +27,10 @@
 >
 > ### 修复
 > - `ProcessGroupMessage` 类型转换问题：兼容 `WSGroupMessageData`（全量）与 `WSGroupATMessageData`（@）两种事件，避免下游 type switch 匹配失败导致消息被误拦
+> - **官方 username 回填 `Sender.nickname/card`**：官方事件 `author.username` 已返回真实昵称（如 `Daniel_户山兔兔`），此前 OneBot 事件的 `sender.nickname/card` 恒为空。现在 `card_nick` 配置优先，否则回退使用官方 username 作为默认昵称（覆盖群消息 + C2C 私聊）
+>
+> ### 已知待办
+> - **回调按钮唤醒机制**（规避主动消息 60/min 频控）：Gensokyo 已有按钮回调 → `event_id` 缓存的基础链路（`ProcessInlineSearch` → `echo.AddEvnetID`），但缺少"无可用 event_id 时自动发送回调按钮消息唤醒"的闭环。若未来群服互通高频推送触发频控，需在 `send_group_msg.go` 补上主动唤醒逻辑（参考 amsghook 的 CALLBACK_KEYBOARD + event_id 用次管理 5 次淘汰）
 >
 > ---
 
