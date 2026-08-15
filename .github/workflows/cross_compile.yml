@@ -9,7 +9,6 @@ on:
       - 'readme.md'
       - 'README.md'
       - 'docs/**'
-      - '.github/workflows/*.yml'
 
 jobs:
   build:
