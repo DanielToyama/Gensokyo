@@ -1,151 +1,115 @@
-name: Cross Compile Go Project
+name: Auto Build & Release
 
+# 每次 push 到 main 分支：自动打日期 tag → 构建 exe → 发布 Release
 on:
-  pull_request:
-    types: [opened, synchronize]
   push:
-    tags:
-      - '*'
+    branches:
+      - main
+    paths-ignore:
+      - 'readme.md'
+      - 'README.md'
+      - 'docs/**'
+      - '.github/workflows/*.yml'
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }} for ${{ matrix.goarch }}
+    name: Build ${{ matrix.os }}-${{ matrix.goarch }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - os: linux
-            goarch: amd64
-          - os: linux
-            goarch: 386
-          - os: linux
-            goarch: arm
-          - os: linux
-            goarch: arm64
-          - os: darwin
-            goarch: amd64
-          - os: darwin
-            goarch: arm64
           - os: windows
             goarch: amd64
-          - os: windows
-            goarch: 386
-          - os: android
+          - os: linux
+            goarch: amd64
+          - os: linux
             goarch: arm64
-          # ... Add other combinations as needed
 
     steps:
-    - name: Checkout code
+    - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21.1' # Set to specific Go version.
+        go-version: '1.21.1'
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.9.0' # 使用最新的 LTS 版本
-
-    - name: Cache Node modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          frontend/node_modules
-          ~/.npm
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-
-    - name: Install Quasar CLI and dependencies
+    - name: Prepare webui/dist placeholder
       run: |
-        cd frontend
-        npm install -g @quasar/cli
-        npm install
+        # go:embed 需要 webui/dist 目录存在（前端产物未包含在源码仓库）
+        mkdir -p webui/dist/css webui/dist/js webui/dist/fonts webui/dist/icons
+        echo "" > webui/dist/index.html
+        echo "" > webui/dist/css/app.css
+        echo "" > webui/dist/js/app.js
+        echo "" > webui/dist/fonts/font.woff
+        echo "" > webui/dist/icons/icon.png
 
-    - name: Build Quasar Project
-      run: |
-        cd frontend
-        quasar build
-
-    - name: Cache Android NDK
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{ github.workspace }}/android-ndk-r21e
-        key: ${{ runner.os }}-android-ndk-r21e
-
-    - name: Download and setup Android NDK
-      if: steps.cache.outputs.cache-hit != 'true' && matrix.os == 'android'
-      run: |
-        sudo apt-get install -y wget unzip
-        wget https://dl.google.com/android/repository/android-ndk-r21e-linux-x86_64.zip -O ndk.zip
-        unzip ndk.zip
-        export ANDROID_NDK_HOME=$PWD/android-ndk-r21e
-        echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
-
-    - name: Create output directory
-      run: mkdir -p output
-
-    - name: Compile Go for target
+    - name: Compile for target
       env:
         GOOS: ${{ matrix.os }}
         GOARCH: ${{ matrix.goarch }}
         CGO_ENABLED: 0
       run: |
+        mkdir -p output
         if [ "$GOOS" = "windows" ]; then
           go build -ldflags="-s -w" -o output/gensokyo-${{ matrix.os }}-${{ matrix.goarch }}.exe
         else
           go build -ldflags="-s -w" -o output/gensokyo-${{ matrix.os }}-${{ matrix.goarch }}
         fi
 
-    - name: Compress executable files with UPX (except for gensokyo-android-arm64 and darwin)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y upx
-        if [[ "${{ matrix.os }}" == *"windows"* ]]; then
-          FILENAME="output/gensokyo-${{ matrix.os }}-${{ matrix.goarch }}.exe"
-        else
-          FILENAME="output/gensokyo-${{ matrix.os }}-${{ matrix.goarch }}"
-        fi
-        if [[ "${{ matrix.os }}" == "android" && "${{ matrix.goarch }}" == "arm64" ]] || [[ "${{ matrix.os }}" == "darwin" ]]; then
-          echo "Skipping UPX compression for $FILENAME"
-        else
-          upx --best --lzma "$FILENAME"
-        fi      
-
-    - name: Upload artifacts
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: gensokyo-${{ matrix.os }}-${{ matrix.goarch }}
-        path: output/gensokyo-${{ matrix.os }}-${{ matrix.goarch }}${{ endsWith(matrix.os, 'windows') && '.exe' || '' }}
+        path: output/*
 
-  prepare_release:
+  release:
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: output
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-      - name: Flatten artifacts for upload
-        run: |
-          # 把 output/<artifact-name>/文件 展平到 output/，便于 action-gh-release 通配
-          find output -type f \( -name "gensokyo-*" -o -name "gensokyo-*.exe" \) -exec cp {} output/ \; 2>/dev/null || true
-          ls -la output/
+    - name: Generate date-based tag
+      id: tag
+      run: |
+        TAG="v$(date +'%Y.%m.%d.%H%M%S')"
+        echo "TAG=$TAG" >> $GITHUB_OUTPUT
+        echo "生成 tag: $TAG"
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          # 自动根据本次 tag 范围内的 commit 生成 release notes，无需手动维护修改说明
-          generate_release_notes: true
-          files: |
-            output/gensokyo-*
-          draft: false
-          prerelease: false
+    - name: Create tag
+      env:
+        TAG: ${{ steps.tag.outputs.TAG }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git tag "$TAG" "${{ github.sha }}"
+        git push origin "$TAG"
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: output
+
+    - name: Flatten artifacts
+      run: |
+        find output -type f \( -name "gensokyo-*" -o -name "gensokyo-*.exe" \) -exec cp {} output/ \; 2>/dev/null || true
+        ls -la output/
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.tag.outputs.TAG }}
+        name: Release ${{ steps.tag.outputs.TAG }}
+        # 自动根据 tag 范围内的 commit 生成 release notes
+        generate_release_notes: true
+        files: |
+          output/gensokyo-*
+        draft: false
+        prerelease: false
