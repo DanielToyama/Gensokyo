@@ -1159,6 +1159,26 @@ func RevertTransformedText(data interface{}, msgtype string, api openapi.OpenAPI
 		}
 	}
 
+	// [新增] 官方群消息里的 @ 是 <@openid> 内嵌标签(实测环境验证; 频道场景可能是 <@!openid>),
+	// 统一转为 onebot CQ at 码, 使 raw_message/message 体现 [CQ:at,qq=xxx]
+	// 注意: <@!数字> 已在上面处理; 这里只处理 32位十六进制 openid 形态的 @
+	openidRe := regexp.MustCompile(`<@!?([0-9a-fA-F]{32})>`)
+	messageText = openidRe.ReplaceAllStringFunc(messageText, func(m string) string {
+		submatches := openidRe.FindStringSubmatch(m)
+		if len(submatches) > 1 {
+			openid := submatches[1]
+			// openid -> int (与发送者/其他事件映射一致)
+			userID64, err := idmap.StoreIDv2(openid)
+			if err != nil {
+				// 存储失败保留原样
+				mylog.Printf("Error storing ID: %v", err)
+				return m
+			}
+			return "[CQ:at,qq=" + strconv.FormatInt(userID64, 10) + "]"
+		}
+		return m
+	})
+
 	var originmessageText = messageText
 	//mylog.Printf("2[%v]", messageText)
 
@@ -1463,6 +1483,7 @@ func ConvertToSegmentedMessage(data interface{}) []map[string]interface{} {
 		menumsg = true
 	}
 	var messageSegments []map[string]interface{}
+	var imageSegments []map[string]interface{}
 
 	// 处理Attachments字段来构建图片消息
 	for _, attachment := range msg.Attachments {
@@ -1478,7 +1499,7 @@ func ConvertToSegmentedMessage(data interface{}) []map[string]interface{} {
 				"url":     attachment.URL,
 			},
 		}
-		messageSegments = append(messageSegments, imageSegment)
+		imageSegments = append(imageSegments, imageSegment)
 
 		// 在msg.Content中替换旧的图片链接
 		//newImagePattern := "[CQ:image,file=" + attachment.URL + "]"
@@ -1486,63 +1507,6 @@ func ConvertToSegmentedMessage(data interface{}) []map[string]interface{} {
 	}
 	// 将msg.Content里的BotID替换成AppID
 	msg.Content = strings.ReplaceAll(msg.Content, BotID, AppID)
-	// 使用正则表达式查找所有的[@数字]格式
-	r := regexp.MustCompile(`<@!(\d+)>`)
-	atMatches := r.FindAllStringSubmatch(msg.Content, -1)
-	for _, match := range atMatches {
-		userID := match[1]
-
-		if userID == AppID {
-			if config.GetRemoveAt() {
-				// 根据配置移除
-				msg.Content = strings.Replace(msg.Content, match[0], "", 1)
-				continue // 跳过当前循环迭代
-			} else {
-				//将其转换为AppID
-				userID = AppID
-				// 构建at部分的映射并加入到messageSegments
-				atSegment := map[string]interface{}{
-					"type": "at",
-					"data": map[string]interface{}{
-						"qq": userID,
-					},
-				}
-				messageSegments = append(messageSegments, atSegment)
-				// 从原始内容中移除at部分
-				msg.Content = strings.Replace(msg.Content, match[0], "", 1)
-				continue // 跳过当前循环迭代
-			}
-		}
-		// 不是 AppID，进行正常处理
-		userID64, err := idmap.StoreIDv2(userID)
-		if err != nil {
-			// 如果存储失败，记录错误并继续使用原始 userID
-			mylog.Printf("Error storing ID: %v", err)
-		} else {
-			// 类型转换成功，使用新的 userID
-			userID = strconv.FormatInt(userID64, 10)
-		}
-
-		// 构建at部分的映射并加入到messageSegments
-		atSegment := map[string]interface{}{
-			"type": "at",
-			"data": map[string]interface{}{
-				"qq": userID,
-			},
-		}
-		messageSegments = append(messageSegments, atSegment)
-
-		// 从原始内容中移除at部分
-		msg.Content = strings.Replace(msg.Content, match[0], "", 1)
-	}
-	//结构 <@!>空格/内容
-	//如果移除了前部at,信息就会以空格开头,因为只移去了最前面的at,但at后紧跟随一个空格
-	if config.GetRemoveAt() {
-		//再次去前后空
-		if !menumsg {
-			msg.Content = strings.TrimSpace(msg.Content)
-		}
-	}
 
 	// 检查是否需要移除前缀
 	if config.GetRemovePrefixValue() {
@@ -1551,18 +1515,81 @@ func ConvertToSegmentedMessage(data interface{}) []map[string]interface{} {
 			msg.Content = msg.Content[:idx] + msg.Content[idx+1:]
 		}
 	}
-	// 如果还有其他内容，那么这些内容被视为文本部分
-	if msg.Content != "" {
-		textSegment := map[string]interface{}{
-			"type": "text",
-			"data": map[string]interface{}{
-				"text": msg.Content,
-			},
+
+	// [修复] 官方群消息的 @ 是 <@openid>(实测环境; 兼容旧 <@!数字> 与频道 <@!openid>),
+	// 按原文位置切分 content, 生成顺序正确的 text/at 段(符合 onebot v11 消息段规范 array.md)
+	atTagRe := regexp.MustCompile(`<@!?\d+>|<@!?[0-9a-fA-F]{32}>`)
+	cursor := 0
+	for _, loc := range atTagRe.FindAllStringIndex(msg.Content, -1) {
+		// 标签前的文本
+		if loc[0] > cursor {
+			messageSegments = append(messageSegments, map[string]interface{}{
+				"type": "text",
+				"data": map[string]interface{}{"text": msg.Content[cursor:loc[0]]},
+			})
 		}
-		messageSegments = append(messageSegments, textSegment)
+		tag := msg.Content[loc[0]:loc[1]]
+		raw := strings.TrimPrefix(strings.TrimSuffix(tag, ">"), "<@")
+		raw = strings.TrimPrefix(raw, "!")
+		userID := raw
+		if userID == AppID {
+			if config.GetRemoveAt() {
+				// 按配置移除@机器人, 不产生段
+			} else {
+				messageSegments = append(messageSegments, map[string]interface{}{
+					"type": "at",
+					"data": map[string]interface{}{"qq": AppID},
+				})
+			}
+		} else {
+			userID64, err := idmap.StoreIDv2(userID)
+			if err != nil {
+				mylog.Printf("Error storing ID: %v", err)
+				// 存储失败, 保留原标签文本
+				messageSegments = append(messageSegments, map[string]interface{}{
+					"type": "text",
+					"data": map[string]interface{}{"text": tag},
+				})
+			} else {
+				messageSegments = append(messageSegments, map[string]interface{}{
+					"type": "at",
+					"data": map[string]interface{}{"qq": strconv.FormatInt(userID64, 10)},
+				})
+			}
+		}
+		cursor = loc[1]
 	}
-	//排列
-	messageSegments = sortMessageSegments(messageSegments)
+	// 标签后的剩余文本
+	if cursor < len(msg.Content) {
+		messageSegments = append(messageSegments, map[string]interface{}{
+			"type": "text",
+			"data": map[string]interface{}{"text": msg.Content[cursor:]},
+		})
+	}
+
+	// 合并相邻文本段(切分可能产生连续text)
+	var merged []map[string]interface{}
+	for _, seg := range messageSegments {
+		if seg["type"] == "text" && len(merged) > 0 && merged[len(merged)-1]["type"] == "text" {
+			d1 := merged[len(merged)-1]["data"].(map[string]interface{})
+			d2 := seg["data"].(map[string]interface{})
+			d1["text"] = d1["text"].(string) + d2["text"].(string)
+		} else {
+			merged = append(merged, seg)
+		}
+	}
+	messageSegments = merged
+
+	// GetRemoveAt 时去掉开头的@机器人留下的空格
+	if config.GetRemoveAt() && !menumsg && len(messageSegments) > 0 && messageSegments[0]["type"] == "text" {
+		d := messageSegments[0]["data"].(map[string]interface{})
+		if t, ok := d["text"].(string); ok {
+			d["text"] = strings.TrimSpace(t)
+		}
+	}
+
+	// 图片段放最后(官方不提供位置信息)
+	messageSegments = append(messageSegments, imageSegments...)
 	return messageSegments
 }
 
