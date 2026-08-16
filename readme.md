@@ -35,6 +35,7 @@
 
 >
 > ### 配置说明
+> 🛠️ 不想手写配置？用**可视化配置生成器**：[打开 gensokyo-config-gen.html](https://htmlpreview.github.io/?https://raw.githubusercontent.com/DanielToyama/Gensokyo/main/gensokyo-config-gen.html)（浏览器直接渲染成页面；也可本地双击仓库根目录同名文件，或在 SparkBridge 的「Gensokyo配置生成」页面使用内置同款）
 > ```yaml
 > text_intent:
 >   - "GroupMessageEventHandler"      # 群全量消息（需官方开放权限）
@@ -53,6 +54,20 @@
 > - **官方 username 回填 `Sender.nickname/card`**：官方事件 `author.username` 已返回真实昵称（如 `Daniel_户山兔兔`），此前 OneBot 事件的 `sender.nickname/card` 恒为空。现在 `card_nick` 配置优先，否则回退使用官方 username 作为默认昵称（覆盖群消息 + C2C 私聊）
 > - **群消息 @ 转文字**：官方 API 无可用真 @ 方案（`<qqbot-at-user id=.../>` 实测显示原文），出站 at 段自动转 `@昵称` 文本（昵称缓存优先；昵称未知时移除 at，见新增能力 5）
 > - **入站 @ 转 CQ at**：官方群消息里的 @ 是 `<@openid>` 内嵌标签（旧正则只匹配 `<@!数字>`），现已转成 `[CQ:at,qq=xxx]` 体现在 raw_message/message——xxx 与 gsk 中该成员的 user_id 一致，下游插件可用它指定人（如"@某人 绑定白名单"）
+>
+> ### 方案优势（对比普通QQ小号挂机方案）
+> - **官方机器人接入**：机器人是官方开放平台注册的应用，**无需普通 QQ 小号挂机**（不需要手机/电脑保持 QQ 在线、不会被挤下线）
+> - **不掉线**：走官方 WebSocket 网关 + 自动重连，无登录态过期、无第三方协议风控下线，长期稳定运行
+> - **全局信息**：消息经官方云端 API 全局收发，与任何客户端/设备解耦，重启进程即恢复
+> - **不易封号**：官方通道合法合规，不存在腾讯封杀第三方协议的风险
+>
+> ### 方案边界（官方 API v2 限制，请先了解）
+> - **无真 @**：@ 仅以文本显示（官方不渲染标签，出站自动转 `@昵称` 文本，见新增能力 5）
+> - **主动消息频控**：Bot 维度 60 QPM（未认证 30 QPM），单关系 20 QPM，不适合高频刷屏场景
+> - **官方接口能力有限**：踢人、改群名、拉取成员列表等官方 API 没有，这类功能无法实现
+> - **群管理操作需管理员**：入群审批、群禁言等需要机器人是群管理员，由群主在手机 QQ 客户端给机器人配置权限
+> - **部分资料不可得**：QQ 等级、性别、年龄官方不提供（`get_stranger_info` 返回占位/QQ等级恒 9999）
+> - **链接域名校验**：消息里的链接需过 QQ 域名校验，gsk 提供**二维码/短链**两种规避方式（配置生成器⑤）
 >
 > ### 已知待办
 > - **回调按钮唤醒机制**（规避主动消息 60/min 频控）：Gensokyo 已有按钮回调 → `event_id` 缓存的基础链路（`ProcessInlineSearch` → `echo.AddEvnetID`），但缺少"无可用 event_id 时自动发送回调按钮消息唤醒"的闭环。若未来群服互通高频推送触发频控，需在 `send_group_msg.go` 补上主动唤醒逻辑（参考 amsghook 的 CALLBACK_KEYBOARD + event_id 用次管理 5 次淘汰）
