@@ -913,6 +913,8 @@ func isIPAddress(address string) bool {
 }
 
 // at处理
+// 官方API实测不渲染任何 @ 标签(<qqbot-at-user id="openid"/> 会显示原文, amsghook 等实战项目
+// 亦确认"官机不支持 at"), 因此出站 at 转为 @昵称 文本(昵称缓存优先); 昵称未知时直接移除
 func transformMessageTextAt(messageText string, groupid string) string {
 	// DoNotReplaceAppid=false(默认频道bot,需要自己at自己时,否则改成true)
 	if !config.GetDoNotReplaceAppid() {
@@ -939,7 +941,7 @@ func transformMessageTextAt(messageText string, groupid string) string {
 			if err != nil {
 				// 如果出错，也替换成相应的格式，但使用原始QQ号
 				mylog.Printf("Error retrieving user ID: %v", err)
-				return "<@!" + submatches[1] + ">"
+				return "" // 反查失败, 移除at(无昵称可显示)
 			}
 
 			// 在这里检查 GetRemoveBotAtGroup 和 realUserID 的长度
@@ -947,7 +949,12 @@ func transformMessageTextAt(messageText string, groupid string) string {
 				return ""
 			}
 
-			return "<@!" + realUserID + ">"
+			// 官方API不渲染@标签(实测显示原文, amsghook等实战项目亦确认"官机不支持 at"),
+			// 因此 at 转为 @昵称 文本(昵称缓存有则用之); 昵称未知时直接移除(QQ号对群友无意义)
+			if nick := idmap.RetrieveUsernameByOpenID(realUserID); nick != "" {
+				return "@" + nick
+			}
+			return ""
 		}
 		return m
 	})
@@ -982,7 +989,7 @@ func transformMessageTextAtNoGroupID(messageText string) string {
 			if err != nil {
 				// 如果出错，也替换成相应的格式，但使用原始QQ号
 				mylog.Printf("Error retrieving user ID: %v", err)
-				return "<@!" + submatches[1] + ">"
+				return "" // 反查失败, 移除at(无昵称可显示)
 			}
 
 			// 在这里检查 GetRemoveBotAtGroup 和 realUserID 的长度
@@ -990,7 +997,12 @@ func transformMessageTextAtNoGroupID(messageText string) string {
 				return ""
 			}
 
-			return "<@!" + realUserID + ">"
+			// 官方API不渲染@标签(实测显示原文, amsghook等实战项目亦确认"官机不支持 at"),
+			// 因此 at 转为 @昵称 文本(昵称缓存有则用之); 昵称未知时直接移除(QQ号对群友无意义)
+			if nick := idmap.RetrieveUsernameByOpenID(realUserID); nick != "" {
+				return "@" + nick
+			}
+			return ""
 		}
 		return m
 	})

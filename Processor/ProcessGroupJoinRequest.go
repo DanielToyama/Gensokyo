@@ -12,8 +12,8 @@ import (
 
 // OnebotGroupJoinRequest 用户申请加群事件转换后的 onebot v11 request.group 事件 (带增强字段)
 type OnebotGroupJoinRequest struct {
-	Comment     string `json:"comment"`     // 验证消息内容
-	Flag        string `json:"flag"`        // join_request_id, 审批(set_group_add_request)时回传
+	Comment     string `json:"comment"` // 验证消息内容
+	Flag        string `json:"flag"`    // join_request_id, 审批(set_group_add_request)时回传
 	GroupID     int64  `json:"group_id"`
 	PostType    string `json:"post_type"`
 	RequestType string `json:"request_type"`
@@ -25,12 +25,12 @@ type OnebotGroupJoinRequest struct {
 	RealGroupID string `json:"real_group_id,omitempty"` //当前真实gid
 
 	// 增强字段
-	Username     string `json:"username,omitempty"`      // 申请人昵称
-	RiskTips     string `json:"risk_tips,omitempty"`     // 安全提示语
-	ApplySource  string `json:"apply_source,omitempty"`  // self_apply 主动申请, invited 被邀请
-	InvitedBy    string `json:"invited_by,omitempty"`    // 邀请人openid
-	VerifyMethod string `json:"verify_method,omitempty"` // 入群验证方式
-	Bot          bool   `json:"bot,omitempty"`           // 是否为机器人账号
+	Username     string `json:"username,omitempty"`                  // 申请人昵称
+	RiskTips     string `json:"risk_tips,omitempty"`                 // 安全提示语
+	ApplySource  string `json:"apply_source,omitempty"`              // self_apply 主动申请, invited 被邀请
+	InvitedBy    string `json:"invited_by,omitempty"`                // 邀请人openid
+	VerifyMethod string `json:"verify_method,omitempty"`             // 入群验证方式
+	Bot          bool   `json:"bot,omitempty"`                       // 是否为机器人账号
 	AutoApproved string `json:"auto_approved_strategy_id,omitempty"` // 自动审批通过的策略ID
 }
 
@@ -65,6 +65,11 @@ func (p *Processors) ProcessGroupJoinRequest(data *dto.GroupJoinRequestEvent) er
 	} else {
 		selfid64 = int64(p.Settings.AppID)
 	}
+
+	// [新增] 缓存申请人昵称(官方事件携带的 username), 供 get_stranger_info 反查展示
+	idmap.StoreUsernameV2(data.MemberOpenID, data.Username)
+	// [新增] 缓存入群申请 id -> (群,成员) openid, 供 set_group_add_request 只传 flag 时审批
+	idmap.StoreJoinRequestV2(data.JoinRequestID, data.GroupOpenID, data.MemberOpenID)
 
 	comment := ""
 	if data.VerifyInfo != nil {

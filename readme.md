@@ -27,6 +27,12 @@
 >      - `set_group_add_request` → 官方"入群申请审批"（approve/refuse，flag=join_request_id，reason=拒绝理由）
 >      - 拓展API：`get_group_join_request_list`（入群申请列表，分页）、`get_group_restrict_chat_setting` / `set_group_restrict_chat_setting`（禁言状态查询 / 原始透传）、`get_group_bot_state`（机器人群内状态）
 >      - 入群自动审批策略 6 个接口：`create/get/update/delete_join_approval_strategy` + `update_join_approval_strategy_whitelist` + `execute_join_approval_strategy`
+> 5. **SparkBridge 群服互通适配**
+>    - **群消息 at 转文字**：官方 API 实测不渲染任何 @ 标签（`<qqbot-at-user id="openid"/>` 显示原文，amsghook 等实战项目亦确认"官机不支持 at"），gsk 出站时自动把 at 段转成 **`@昵称`** 文本（昵称缓存优先：每条群消息/加群申请都会缓存官方 username）；**昵称未知时直接移除 at**（QQ 号对群友无意义）
+>    - **`get_stranger_info` 已实现**：昵称取官方事件缓存的 `username`（加群申请等事件携带）；`sex/age` 官方不提供返回空/0；**`qqLevel` 官方无 QQ 等级数据，固定 9999** 放行等级门槛（防插件按 0 级误拒）
+>    - **任何 action 都有合法 JSON 回应**：未注册/出错的 action 回 `{"status":"failed","retcode":1400,"data":{"message":...},"echo":...}`，不再沉默（避免 SparkBridge 等对端等待超时拿 undefined 后 JSON5 解析崩溃）
+>    - **`set_group_add_request` 支持只传 flag**：SparkBridge groupRequest 插件审批只传 `flag(join_request_id)`/`approve`/`reason` 时，从事件缓存（`join_request_id → 群/成员 openid`）反查后调官方审批接口；`approve=false` 即拒绝（不再要求 refuse 字段）
+
 >
 > ### 配置说明
 > ```yaml
@@ -45,6 +51,7 @@
 > ### 修复
 > - `ProcessGroupMessage` 类型转换问题：兼容 `WSGroupMessageData`（全量）与 `WSGroupATMessageData`（@）两种事件，避免下游 type switch 匹配失败导致消息被误拦
 > - **官方 username 回填 `Sender.nickname/card`**：官方事件 `author.username` 已返回真实昵称（如 `Daniel_户山兔兔`），此前 OneBot 事件的 `sender.nickname/card` 恒为空。现在 `card_nick` 配置优先，否则回退使用官方 username 作为默认昵称（覆盖群消息 + C2C 私聊）
+> - **群消息 @ 转文字**：官方 API 无可用真 @ 方案（`<qqbot-at-user id=.../>` 实测显示原文），出站 at 段自动转 `@昵称` 文本（昵称缓存优先；昵称未知时移除 at，见新增能力 5）
 >
 > ### 已知待办
 > - **回调按钮唤醒机制**（规避主动消息 60/min 频控）：Gensokyo 已有按钮回调 → `event_id` 缓存的基础链路（`ProcessInlineSearch` → `echo.AddEvnetID`），但缺少"无可用 event_id 时自动发送回调按钮消息唤醒"的闭环。若未来群服互通高频推送触发频控，需在 `send_group_msg.go` 补上主动唤醒逻辑（参考 amsghook 的 CALLBACK_KEYBOARD + event_id 用次管理 5 次淘汰）

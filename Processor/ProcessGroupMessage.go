@@ -107,6 +107,9 @@ func (p *Processors) ProcessGroupMessage(data *dto.Message, isAtEvent ...bool) e
 		}
 	}
 
+	// [新增] 缓存发送者昵称(每条群消息都携带官方 username), 供 at 转文字(@昵称)与 get_stranger_info 反查
+	idmap.StoreUsernameV2(data.Author.ID, data.Author.Username)
+
 	var messageText string
 	GetDisableErrorChan := config.GetDisableErrorChan()
 

@@ -257,7 +257,8 @@ ${intentLines}
   #指令魔法类（默认关闭白名单，避免拦截所有消息）
   remove_prefix : false
   remove_at : false
-  remove_bot_at_group : true
+  #官方新格式<qqbot-at-user id="openid"/>已支持群聊@, 保持false, 否则会吞掉对真实成员的@(含进群欢迎)
+  remove_bot_at_group : false
   add_at_group : false
   white_prefix_mode : false
   v_white_prefix_mode : false

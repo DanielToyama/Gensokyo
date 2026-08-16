@@ -84,24 +84,24 @@ type ParamsContent struct {
 	CallbackData string    `json:"callback_data,omitempty"` // 新增: 用于接收 GenerateURLLink 的参数
 
 	// [新增] 群聊管理相关参数 (set_group_add_request / join_request_list / strategy 等)
-	Approve     bool   `json:"approve,omitempty"`      // 入群审批: 是否通过
-	Refuse      bool   `json:"refuse,omitempty"`       // 入群审批: 是否拒绝
-	Reason      string `json:"reason,omitempty"`       // 入群审批: 拒绝理由
-	Flag        string `json:"flag,omitempty"`         // 入群审批: 申请ID(join_request_id)
-	Cursor      string `json:"cursor,omitempty"`       // 分页游标
-	Limit       int    `json:"limit,omitempty"`        // 分页数量
-	StrategyID  string `json:"strategy_id,omitempty"`  // 策略ID
-	GroupOpenIDs []string `json:"group_openids,omitempty"` // 关联群 openid 列表
-	GroupIDs    []string `json:"group_ids,omitempty"`     // 关联 QQ 群号列表
-	IsEnable    string   `json:"is_enable,omitempty"`     // on-启用 off-关闭
-	ExpireAt    string   `json:"expire_at,omitempty"`     // 过期时间 RFC3339
-	Remark      string   `json:"remark,omitempty"`        // 策略备注
-	WhitelistUsers []string `json:"whitelist_users,omitempty"` // 白名单QQ号码列表
-	WhitelistOp    string   `json:"whitelist_op,omitempty"`    // 白名单操作: add 新增号码, del 删除号码
-	GroupActionOp          string   `json:"group_action_op,omitempty"`            // 关联群操作: add/del
-	GroupActionGroupOpenIDs []string `json:"group_action_group_openids,omitempty"` // 关联群操作-openid 列表
-	GroupActionGroupIDs     []string `json:"group_action_group_ids,omitempty"`     // 关联群操作-群号列表
-	Members []MemberMuteStateParam `json:"members,omitempty"` // 群禁言成员列表(原始扩展API用)
+	Approve                 bool                   `json:"approve,omitempty"`                    // 入群审批: 是否通过
+	Refuse                  bool                   `json:"refuse,omitempty"`                     // 入群审批: 是否拒绝
+	Reason                  string                 `json:"reason,omitempty"`                     // 入群审批: 拒绝理由
+	Flag                    string                 `json:"flag,omitempty"`                       // 入群审批: 申请ID(join_request_id)
+	Cursor                  string                 `json:"cursor,omitempty"`                     // 分页游标
+	Limit                   int                    `json:"limit,omitempty"`                      // 分页数量
+	StrategyID              string                 `json:"strategy_id,omitempty"`                // 策略ID
+	GroupOpenIDs            []string               `json:"group_openids,omitempty"`              // 关联群 openid 列表
+	GroupIDs                []string               `json:"group_ids,omitempty"`                  // 关联 QQ 群号列表
+	IsEnable                string                 `json:"is_enable,omitempty"`                  // on-启用 off-关闭
+	ExpireAt                string                 `json:"expire_at,omitempty"`                  // 过期时间 RFC3339
+	Remark                  string                 `json:"remark,omitempty"`                     // 策略备注
+	WhitelistUsers          []string               `json:"whitelist_users,omitempty"`            // 白名单QQ号码列表
+	WhitelistOp             string                 `json:"whitelist_op,omitempty"`               // 白名单操作: add 新增号码, del 删除号码
+	GroupActionOp           string                 `json:"group_action_op,omitempty"`            // 关联群操作: add/del
+	GroupActionGroupOpenIDs []string               `json:"group_action_group_openids,omitempty"` // 关联群操作-openid 列表
+	GroupActionGroupIDs     []string               `json:"group_action_group_ids,omitempty"`     // 关联群操作-群号列表
+	Members                 []MemberMuteStateParam `json:"members,omitempty"`                    // 群禁言成员列表(原始扩展API用)
 }
 
 // MemberMuteStateParam 设置群成员禁言的单项参数
@@ -238,16 +238,39 @@ func RegisterHandler(action string, handler HandlerFunc) {
 func CallAPIFromDict(client Client, api openapi.OpenAPI, apiv2 openapi.OpenAPI, message ActionMessage) string {
 	handler, ok := handlers[message.Action]
 	if !ok {
+		// [修复] 未注册的 action 必须回一个合法的 onebot 错误响应, 不能沉默/返回空串。
+		// 否则对端(如 SparkBridge)等不到响应会超时, 插件拿 undefined 直接 JSON5 解析崩溃。
 		mylog.Println("Unsupported action:", message.Action)
+		SendAPIError(client, message, "Unsupported action: "+message.Action)
 		return ""
 	}
 
 	jsonString, err := handler(client, api, apiv2, message)
 	if err != nil {
-		// 处理错误
+		// 处理错误: 同样回合法错误响应, 避免对端挂起
 		mylog.Println("Error handling action:", message.Action, "Error:", err)
+		SendAPIError(client, message, fmt.Sprintf("%s: %v", message.Action, err))
 		return ""
 	}
 
 	return jsonString
+}
+
+// SendAPIError 向对端发送 onebot v11 标准错误响应 (retcode 1400)
+// 未注册的 action / handler 出错 都会走这里, 保证任何请求都有合法 JSON 回应,
+// 避免对端(SparkBridge 等)等待超时拿到 undefined 后 JSON5 解析崩溃。
+func SendAPIError(client Client, message ActionMessage, errMsg string) {
+	resp := map[string]interface{}{
+		"status":  "failed",
+		"retcode": 1400,
+		"data": map[string]interface{}{
+			"message": errMsg,
+		},
+	}
+	if message.Echo != nil && message.Echo != "" {
+		resp["echo"] = message.Echo
+	}
+	if err := client.SendMessage(resp); err != nil {
+		mylog.Printf("发送错误响应失败: %v", err)
+	}
 }
