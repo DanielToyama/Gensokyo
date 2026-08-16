@@ -20,3 +20,5 @@ webui/dist/
 
 #ignore data
 data/
+
+.git-rewrite/

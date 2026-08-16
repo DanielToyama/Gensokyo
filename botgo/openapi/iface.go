@@ -37,6 +37,36 @@ type OpenAPI interface {
 	WebhookAPI
 	InteractionAPI
 	MessageSettingAPI
+	GroupAPI
+}
+
+// GroupAPI 群聊管理接口 (API v2)
+// 文档: https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/
+type GroupAPI interface {
+	// GetGroupInfo 获取群基本信息
+	GetGroupInfo(ctx context.Context, groupOpenID string) (*dto.GroupInfo, error)
+	// GetGroupBotState 获取机器人群内状态
+	GetGroupBotState(ctx context.Context, groupOpenID string) (*dto.GroupBotState, error)
+	// GetRestrictChatSetting 查询群禁言状态（全员禁言模式 + 成员级禁言列表）
+	GetRestrictChatSetting(ctx context.Context, groupOpenID string) (*dto.GroupRestrictChatSetting, error)
+	// SetRestrictChatSetting 设置群成员禁言（单次不超过10个）
+	SetRestrictChatSetting(ctx context.Context, groupOpenID string, setting *dto.SetRestrictChatSettingToCreate) error
+	// GetJoinRequestList 拉取入群申请列表（分页）
+	GetJoinRequestList(ctx context.Context, groupOpenID, cursor string, limit int) (*dto.JoinRequestList, error)
+	// ApproveJoinRequest 审批入群申请 approve/decline
+	ApproveJoinRequest(ctx context.Context, groupOpenID, memberOpenID string, req *dto.ApproveJoinRequestToCreate) error
+	// CreateJoinApprovalStrategy 创建入群自动审批策略
+	CreateJoinApprovalStrategy(ctx context.Context, strategy *dto.JoinApprovalStrategyToCreate) (*dto.JoinApprovalStrategyResult, error)
+	// GetJoinApprovalStrategyList 查询入群自动审批策略列表（分页）
+	GetJoinApprovalStrategyList(ctx context.Context, cursor string, limit int) (*dto.JoinApprovalStrategyList, error)
+	// UpdateJoinApprovalStrategy 修改入群自动审批策略
+	UpdateJoinApprovalStrategy(ctx context.Context, strategyID string, strategy *dto.UpdateJoinApprovalStrategyToCreate) (*dto.JoinApprovalStrategyResult, error)
+	// DeleteJoinApprovalStrategy 删除入群自动审批策略
+	DeleteJoinApprovalStrategy(ctx context.Context, strategyID string) error
+	// UpdateJoinApprovalStrategyWhitelist 修改入群自动审批策略的白名单号码
+	UpdateJoinApprovalStrategyWhitelist(ctx context.Context, strategyID string, whitelist *dto.WhitelistUsersToCreate) (*dto.WhitelistUpdateResult, error)
+	// ExecuteJoinApprovalStrategy 执行入群自动审批策略（全量扫描, 异步约10分钟）
+	ExecuteJoinApprovalStrategy(ctx context.Context, strategyID string) error
 }
 
 // Base 基础能力接口

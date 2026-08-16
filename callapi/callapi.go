@@ -82,6 +82,33 @@ type ParamsContent struct {
 	Context      Context   `json:"context,omitempty"`       // context 字段
 	Operation    Operation `json:"operation,omitempty"`     // operation 字段
 	CallbackData string    `json:"callback_data,omitempty"` // 新增: 用于接收 GenerateURLLink 的参数
+
+	// [新增] 群聊管理相关参数 (set_group_add_request / join_request_list / strategy 等)
+	Approve     bool   `json:"approve,omitempty"`      // 入群审批: 是否通过
+	Refuse      bool   `json:"refuse,omitempty"`       // 入群审批: 是否拒绝
+	Reason      string `json:"reason,omitempty"`       // 入群审批: 拒绝理由
+	Flag        string `json:"flag,omitempty"`         // 入群审批: 申请ID(join_request_id)
+	Cursor      string `json:"cursor,omitempty"`       // 分页游标
+	Limit       int    `json:"limit,omitempty"`        // 分页数量
+	StrategyID  string `json:"strategy_id,omitempty"`  // 策略ID
+	GroupOpenIDs []string `json:"group_openids,omitempty"` // 关联群 openid 列表
+	GroupIDs    []string `json:"group_ids,omitempty"`     // 关联 QQ 群号列表
+	IsEnable    string   `json:"is_enable,omitempty"`     // on-启用 off-关闭
+	ExpireAt    string   `json:"expire_at,omitempty"`     // 过期时间 RFC3339
+	Remark      string   `json:"remark,omitempty"`        // 策略备注
+	WhitelistUsers []string `json:"whitelist_users,omitempty"` // 白名单QQ号码列表
+	WhitelistOp    string   `json:"whitelist_op,omitempty"`    // 白名单操作: add 新增号码, del 删除号码
+	GroupActionOp          string   `json:"group_action_op,omitempty"`            // 关联群操作: add/del
+	GroupActionGroupOpenIDs []string `json:"group_action_group_openids,omitempty"` // 关联群操作-openid 列表
+	GroupActionGroupIDs     []string `json:"group_action_group_ids,omitempty"`     // 关联群操作-群号列表
+	Members []MemberMuteStateParam `json:"members,omitempty"` // 群禁言成员列表(原始扩展API用)
+}
+
+// MemberMuteStateParam 设置群成员禁言的单项参数
+type MemberMuteStateParam struct {
+	Op           string `json:"op"` // add 增加禁言, update 更新禁言到期时间, del 解除禁言
+	MemberOpenID string `json:"member_openid"`
+	MuteExpireAt string `json:"mute_expire_at,omitempty"`
 }
 
 // Context 结构体用于存储 context 字段相关信息

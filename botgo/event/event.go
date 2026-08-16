@@ -82,6 +82,12 @@ var eventParseFuncMap = map[dto.OPCode]map[dto.EventType]eventParseFunc{
 		dto.EventGroupMsgReject:       groupMsgRejecthandler,
 		dto.EventGroupMsgReceive:      groupMsgReceivehandler,
 
+		// [新增] 群聊管理事件
+		dto.EventGroupMemberAdd:        groupMemberAddHandler,
+		dto.EventGroupMemberRemove:     groupMemberRemoveHandler,
+		dto.EventGroupJoinRequest:      groupJoinRequestHandler,
+		dto.EventSubscribeMessageStatus: subscribeMessageStatusHandler,
+
 		// [新增] 注册用户关系链与C2C开关事件处理函数
 		dto.EventFriendAdd:     friendAddHandler,
 		dto.EventFriendDel:     friendDelHandler,
@@ -460,6 +466,54 @@ func groupMsgReceivehandler(payload *dto.WSPayload, message []byte) error {
 	}
 	if DefaultHandlers.GroupMsgReceive != nil {
 		return DefaultHandlers.GroupMsgReceive(payload, data)
+	}
+	return nil
+}
+
+// [新增] 群成员加入事件
+func groupMemberAddHandler(payload *dto.WSPayload, message []byte) error {
+	data := &dto.GroupMemberAddEvent{}
+	if err := ParseData(message, data); err != nil {
+		return err
+	}
+	if DefaultHandlers.GroupMemberAdd != nil {
+		return DefaultHandlers.GroupMemberAdd(payload, data)
+	}
+	return nil
+}
+
+// [新增] 群成员退出事件
+func groupMemberRemoveHandler(payload *dto.WSPayload, message []byte) error {
+	data := &dto.GroupMemberRemoveEvent{}
+	if err := ParseData(message, data); err != nil {
+		return err
+	}
+	if DefaultHandlers.GroupMemberRemove != nil {
+		return DefaultHandlers.GroupMemberRemove(payload, data)
+	}
+	return nil
+}
+
+// [新增] 用户申请加群事件
+func groupJoinRequestHandler(payload *dto.WSPayload, message []byte) error {
+	data := &dto.GroupJoinRequestEvent{}
+	if err := ParseData(message, data); err != nil {
+		return err
+	}
+	if DefaultHandlers.GroupJoinRequest != nil {
+		return DefaultHandlers.GroupJoinRequest(payload, data)
+	}
+	return nil
+}
+
+// [新增] 订阅消息授权状态变更事件
+func subscribeMessageStatusHandler(payload *dto.WSPayload, message []byte) error {
+	data := &dto.SubscribeMessageStatusEvent{}
+	if err := ParseData(message, data); err != nil {
+		return err
+	}
+	if DefaultHandlers.SubscribeMessageStatus != nil {
+		return DefaultHandlers.SubscribeMessageStatus(payload, data)
 	}
 	return nil
 }

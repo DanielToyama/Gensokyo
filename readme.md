@@ -14,6 +14,19 @@
 > 3. **`require_mention` 群消息响应开关**
 >    - `false`（默认）= 全量消息都响应；`true` = 仅响应 @bot 消息
 >    - 仅对全量事件生效，@ 事件不受影响
+> 4. **群聊管理（官方 API v2 群管理板块，20260810+ 新增接口/事件）**
+>    - 事件（新增 `GROUP_MEMBER_EVENT (1<<24)`；并入 `GROUP_AND_C2C_EVENT (1<<25)`）：
+>      - `GROUP_MEMBER_ADD` → onebot `notice.group_increase`（官方事件无操作者字段, sub_type 默认 approve）
+>      - `GROUP_MEMBER_REMOVE` → onebot `notice.group_decrease`（sub_type 默认 leave）
+>      - `GROUP_JOIN_REQUEST`（用户申请加群，机器人需群管理员）→ onebot `request.group`(sub_type=add, flag=join_request_id)
+>      - `SUBSCRIBE_MESSAGE_STATUS`（订阅消息授权状态变更）→ 扩展 `notice.subscribe_message_status`
+>    - 操作（均走官方 v2 群管理接口，调用域名已按官方统一为 `api.bot.qq.com`）：
+>      - `get_group_info` 群类型返回**真实群信息**（原先为模拟数据"测试群"）
+>      - `set_group_ban` → 官方"设置群成员禁言"（`/restrict_chat_setting`，需群管理员，最长 30 天；duration=0 解禁）
+>      - `set_group_whole_ban` → 全员禁言开关（官方文档暂未声明 global_rule 可写，best-effort 透传）
+>      - `set_group_add_request` → 官方"入群申请审批"（approve/refuse，flag=join_request_id，reason=拒绝理由）
+>      - 拓展API：`get_group_join_request_list`（入群申请列表，分页）、`get_group_restrict_chat_setting` / `set_group_restrict_chat_setting`（禁言状态查询 / 原始透传）、`get_group_bot_state`（机器人群内状态）
+>      - 入群自动审批策略 6 个接口：`create/get/update/delete_join_approval_strategy` + `update_join_approval_strategy_whitelist` + `execute_join_approval_strategy`
 >
 > ### 配置说明
 > ```yaml
@@ -21,6 +34,10 @@
 >   - "GroupMessageEventHandler"      # 群全量消息（需官方开放权限）
 >   - "GroupATMessageEventHandler"    # 群@消息
 >   - "C2CMessageEventHandler"        # 群私聊
+>   - "GroupMemberAddEventHandler"    # 群成员加入（需 GROUP_MEMBER_EVENT 权限）
+>   - "GroupMemberRemoveEventHandler" # 群成员退出
+>   - "GroupJoinRequestEventHandler"  # 用户申请加群（机器人需群管理员）
+>   - "SubscribeMessageStatusEventHandler" # 订阅消息授权状态变更
 > allow_proactive_msg: true           # 允许主动消息
 > require_mention: false              # false=全量响应, true=仅@响应
 > ```

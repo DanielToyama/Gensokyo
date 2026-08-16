@@ -4,8 +4,9 @@ import (
 	"fmt"
 )
 
-const domain = "api.sgroup.qq.com"
-const sandBoxDomain = "sandbox.api.sgroup.qq.com"
+// 域名已按官方便于统一为 api.bot.qq.com (变更记录 20260810)
+const domain = "api.bot.qq.com"
+const sandBoxDomain = "sandbox.api.bot.qq.com"
 
 const scheme = "https"
 
@@ -36,6 +37,18 @@ const (
 
 	messageURI       uri = "/channels/{channel_id}/messages/{message_id}"
 	groupMessagesURL uri = "/v2/groups/{group_id}/messages/{message_id}"
+
+	// [新增] 群聊管理接口
+	groupInfoURI                uri = "/v2/groups/{group_id}/info"
+	groupBotStateURI            uri = "/v2/groups/{group_id}/bot_state"
+	groupRestrictChatSettingURI uri = "/v2/groups/{group_id}/restrict_chat_setting"
+	groupJoinRequestListURI     uri = "/v2/groups/{group_id}/join_request_list"
+	groupApprovalJoinRequestURI uri = "/v2/groups/{group_id}/approval_join_request/{member_id}"
+
+	joinApprovalStrategyURI         uri = "/v2/groups/join_approval_strategy"
+	joinApprovalStrategyItemURI     uri = "/v2/groups/join_approval_strategy/{strategy_id}"
+	joinApprovalStrategyWhitelistURI uri = "/v2/groups/join_approval_strategy/{strategy_id}/whitelist_users"
+	joinApprovalStrategyExecuteURI   uri = "/v2/groups/join_approval_strategy/{strategy_id}/execute"
 
 	// [新增] 获取机器人资料页分享链接
 	generateURLLinkURI uri = "/v2/generate_url_link"

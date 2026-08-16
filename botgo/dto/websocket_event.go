@@ -45,6 +45,11 @@ const (
 	EventGroupDelRobot         EventType = "GROUP_DEL_ROBOT"
 	EventGroupMsgReject        EventType = "GROUP_MSG_REJECT"
 	EventGroupMsgReceive       EventType = "GROUP_MSG_RECEIVE"
+	// [新增] 群聊管理事件
+	EventGroupMemberAdd        EventType = "GROUP_MEMBER_ADD"        // 群成员加入
+	EventGroupMemberRemove     EventType = "GROUP_MEMBER_REMOVE"     // 群成员退出
+	EventGroupJoinRequest      EventType = "GROUP_JOIN_REQUEST"      // 用户申请加群
+	EventSubscribeMessageStatus EventType = "SUBSCRIBE_MESSAGE_STATUS" // 订阅消息授权状态变更
 	// [新增] 用户关系链与C2C开关事件
 	EventFriendAdd     EventType = "FRIEND_ADD"
 	EventFriendDel     EventType = "FRIEND_DEL"
@@ -66,9 +71,12 @@ var intentEventMap = map[Intent][]EventType{
 		EventGroupAtMessageCreate, EventGroupMessageCreate, EventC2CMessageCreate, // 原有 + 群全量消息
 		EventGroupAddRobot, EventGroupDelRobot, // 原有
 		EventGroupMsgReject, EventGroupMsgReceive, // 补全群消息开关事件
+		EventGroupJoinRequest, EventSubscribeMessageStatus, // [新增] 用户入群申请 / 订阅消息授权状态
 		EventFriendAdd, EventFriendDel, // [新增] 好友添加/删除
 		EventC2CMsgReject, EventC2CMsgReceive, // [新增] C2C消息开关拒绝/接收
 	},
+
+	IntentGroupMemberEvent: {EventGroupMemberAdd, EventGroupMemberRemove}, // [新增] 群成员变动事件 1<<24
 
 	IntentGuildMessageReactions: {EventMessageReactionAdd, EventMessageReactionRemove},
 	IntentGuildAtMessage:        {EventAtMessageCreate, EventPublicMessageDelete},

@@ -123,28 +123,61 @@ func HandleGetGroupInfo(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 	default:
 		var groupid int64
 		groupid, _ = strconv.ParseInt(message.Params.GroupID.(string), 10, 64)
-		groupCreateTime := time.Now().Unix()
-		// 创建 GroupInfo 实例
-		groupInfo1 := &GroupInfo{
-			GroupID:         groupid,
-			GroupName:       "测试群",
-			GroupMemo:       "这是一个测试群",
-			GroupCreateTime: int32(groupCreateTime),
-			GroupLevel:      0,
-			MemberCount:     500,
-			MaxMemberCount:  1000,
-		}
-		// 创建 OnebotGroupInfo 实例并嵌入 GroupInfo
-		groupInfo = &OnebotGroupInfo{
-			Data:    *groupInfo1, // 将 groupInfo 添加到 Data 切片中
-			Message: "success",
-			RetCode: 0,
-			Status:  "ok",
-		}
-		if message.Echo == "" {
-			groupInfo.Echo = "0"
+
+		// [新增] 群聊管理: 群类型走官方 获取群基本信息 (GET /v2/groups/{group_openid}/info)
+		// 通过 idmap 反查真实群 openid
+		RealGroupID, err := idmap.RetrieveRowByIDv2(message.Params.GroupID.(string))
+		if err != nil || RealGroupID == "" {
+			mylog.Printf("get_group_info(群): 无法反查群openid, GroupID[%v] err[%v], 回退到模拟数据", message.Params.GroupID, err)
 		} else {
-			groupInfo.Echo = message.Echo
+			info, err := apiv2.GetGroupInfo(context.TODO(), RealGroupID)
+			if err != nil || info == nil {
+				mylog.Printf("get_group_info(群): 官方群信息接口调用失败: %v, 回退到模拟数据", err)
+			} else {
+				groupInfo = &OnebotGroupInfo{
+					Data: GroupInfo{
+						GroupID:     groupid,
+						GroupName:   info.GroupName,
+						GroupMemo:   info.GroupFingerMemo,
+						MemberCount: int32(info.GroupMemberNum),
+					},
+					Message: "success",
+					RetCode: 0,
+					Status:  "ok",
+				}
+				if message.Echo == "" {
+					groupInfo.Echo = "0"
+				} else {
+					groupInfo.Echo = message.Echo
+				}
+			}
+		}
+
+		// 回退: 官方接口不可用时的模拟数据
+		if groupInfo == nil {
+			groupCreateTime := time.Now().Unix()
+			// 创建 GroupInfo 实例
+			groupInfo1 := &GroupInfo{
+				GroupID:         groupid,
+				GroupName:       "测试群",
+				GroupMemo:       "这是一个测试群",
+				GroupCreateTime: int32(groupCreateTime),
+				GroupLevel:      0,
+				MemberCount:     500,
+				MaxMemberCount:  1000,
+			}
+			// 创建 OnebotGroupInfo 实例并嵌入 GroupInfo
+			groupInfo = &OnebotGroupInfo{
+				Data:    *groupInfo1, // 将 groupInfo 添加到 Data 切片中
+				Message: "success",
+				RetCode: 0,
+				Status:  "ok",
+			}
+			if message.Echo == "" {
+				groupInfo.Echo = "0"
+			} else {
+				groupInfo.Echo = message.Echo
+			}
 		}
 	}
 	groupInfoMap := structToMap(groupInfo)

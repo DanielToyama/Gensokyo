@@ -40,6 +40,12 @@ var DefaultHandlers struct {
 	GroupMsgReject  GroupMsgRejectHandler
 	GroupMsgReceive GroupMsgReceiveHandler
 
+	// [新增] 群聊管理事件
+	GroupMemberAdd        GroupMemberAddEventHandler        // 群成员加入
+	GroupMemberRemove     GroupMemberRemoveEventHandler     // 群成员退出
+	GroupJoinRequest      GroupJoinRequestEventHandler      // 用户申请加群
+	SubscribeMessageStatus SubscribeMessageStatusEventHandler // 订阅消息授权状态变更
+
 	// [新增] 用户(C2C)关系链与消息开关事件
 	FriendAdd     FriendAddEventHandler
 	FriendDel     FriendDelEventHandler
@@ -131,6 +137,18 @@ type GroupMsgRejectHandler func(event *dto.WSPayload, data *dto.GroupMsgRejectEv
 // GroupMsgReceiveHandler 机器人推送开启事件 handler
 type GroupMsgReceiveHandler func(event *dto.WSPayload, data *dto.GroupMsgReceiveEvent) error
 
+// GroupMemberAddEventHandler 群成员加入事件 handler (GROUP_MEMBER_ADD)
+type GroupMemberAddEventHandler func(event *dto.WSPayload, data *dto.GroupMemberAddEvent) error
+
+// GroupMemberRemoveEventHandler 群成员退出事件 handler (GROUP_MEMBER_REMOVE)
+type GroupMemberRemoveEventHandler func(event *dto.WSPayload, data *dto.GroupMemberRemoveEvent) error
+
+// GroupJoinRequestEventHandler 用户申请加群事件 handler (GROUP_JOIN_REQUEST)
+type GroupJoinRequestEventHandler func(event *dto.WSPayload, data *dto.GroupJoinRequestEvent) error
+
+// SubscribeMessageStatusEventHandler 订阅消息授权状态变更事件 handler (SUBSCRIBE_MESSAGE_STATUS)
+type SubscribeMessageStatusEventHandler func(event *dto.WSPayload, data *dto.SubscribeMessageStatusEvent) error
+
 // ************************************************
 
 // ***************** 用户关系链/C2C开关事件 (新增部分) *****************
@@ -177,6 +195,20 @@ func RegisterHandlers(handlers ...interface{}) dto.Intent {
 			DefaultHandlers.GroupMsgReject = handle
 		case GroupMsgReceiveHandler:
 			DefaultHandlers.GroupMsgReceive = handle
+
+			// [新增] 群聊管理事件
+		case GroupMemberAddEventHandler:
+			DefaultHandlers.GroupMemberAdd = handle
+			i = i | dto.EventToIntent(dto.EventGroupMemberAdd)
+		case GroupMemberRemoveEventHandler:
+			DefaultHandlers.GroupMemberRemove = handle
+			i = i | dto.EventToIntent(dto.EventGroupMemberRemove)
+		case GroupJoinRequestEventHandler:
+			DefaultHandlers.GroupJoinRequest = handle
+			i = i | dto.EventToIntent(dto.EventGroupJoinRequest)
+		case SubscribeMessageStatusEventHandler:
+			DefaultHandlers.SubscribeMessageStatus = handle
+			i = i | dto.EventToIntent(dto.EventSubscribeMessageStatus)
 
 			// [新增] 用户关系链相关注册
 		case FriendAddEventHandler:

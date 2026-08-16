@@ -36,7 +36,7 @@ import (
 	"github.com/hoshinonyaruko/gensokyo/sys"
 	"github.com/hoshinonyaruko/gensokyo/template"
 	"github.com/hoshinonyaruko/gensokyo/url"
-	"github.com/hoshinonyaruko/gensokyo/webui"
+	// webui 已移除: 其前端 embed(webui/dist/*) 需要先构建 Quasar 前端, 见 fork readme
 	"github.com/hoshinonyaruko/gensokyo/wsclient"
 	"github.com/tencent-connect/botgo/sessions/multi"
 	"google.golang.org/grpc"
@@ -138,9 +138,7 @@ func main() {
 		conf.Settings.EnableWsServer = false
 	}
 
-	// 创建webui数据库
-	webui.InitializeDB()
-	defer webui.CloseDB()
+	// [webui已移除] 不再初始化 webui 数据库(原 webui.InitializeDB/CloseDB)
 
 	if conf.Settings.AppID == 12345 {
 		// 输出天蓝色文本
@@ -466,19 +464,7 @@ func main() {
 	r.POST("/"+conf.Settings.WebhookPath, UnionFanout(server.CreateHandleValidationSafe(webhookHandler)))
 
 	r.Static("/channel_temp", "./channel_temp")
-	if config.GetFrpPort() == "0" && !config.GetDisableWebui() {
-		//webui和它的api
-		webuiGroup := r.Group("/webui")
-		{
-			webuiGroup.GET("/*filepath", webui.CombinedMiddleware(api, apiV2))
-			webuiGroup.POST("/*filepath", webui.CombinedMiddleware(api, apiV2))
-			webuiGroup.PUT("/*filepath", webui.CombinedMiddleware(api, apiV2))
-			webuiGroup.DELETE("/*filepath", webui.CombinedMiddleware(api, apiV2))
-			webuiGroup.PATCH("/*filepath", webui.CombinedMiddleware(api, apiV2))
-		}
-	} else {
-		mylog.Println("Either FRP port is set to '0' or WebUI is disabled.")
-	}
+	// [webui已移除] 原 /webui 路由(webui.CombinedMiddleware)已删除
 	//正向http api
 	http_api_address := config.GetHttpAddress()
 	if http_api_address != "" {
@@ -885,6 +871,38 @@ func C2CMsgReceiveHandler() event.C2CMsgReceiveHandler {
 	}
 }
 
+// GroupMemberAddEventHandler 实现处理 群成员加入 事件的回调 (GROUP_MEMBER_ADD)
+func GroupMemberAddEventHandler() event.GroupMemberAddEventHandler {
+	return func(event *dto.WSPayload, data *dto.GroupMemberAddEvent) error {
+		go p.ProcessGroupMemberAdd(data)
+		return nil
+	}
+}
+
+// GroupMemberRemoveEventHandler 实现处理 群成员退出 事件的回调 (GROUP_MEMBER_REMOVE)
+func GroupMemberRemoveEventHandler() event.GroupMemberRemoveEventHandler {
+	return func(event *dto.WSPayload, data *dto.GroupMemberRemoveEvent) error {
+		go p.ProcessGroupMemberRemove(data)
+		return nil
+	}
+}
+
+// GroupJoinRequestEventHandler 实现处理 用户申请加群 事件的回调 (GROUP_JOIN_REQUEST)
+func GroupJoinRequestEventHandler() event.GroupJoinRequestEventHandler {
+	return func(event *dto.WSPayload, data *dto.GroupJoinRequestEvent) error {
+		go p.ProcessGroupJoinRequest(data)
+		return nil
+	}
+}
+
+// SubscribeMessageStatusEventHandler 实现处理 订阅消息授权状态变更 事件的回调 (SUBSCRIBE_MESSAGE_STATUS)
+func SubscribeMessageStatusEventHandler() event.SubscribeMessageStatusEventHandler {
+	return func(event *dto.WSPayload, data *dto.SubscribeMessageStatusEvent) error {
+		go p.ProcessSubscribeMessageStatus(data)
+		return nil
+	}
+}
+
 func getHandlerByName(handlerName string) (interface{}, bool) {
 	switch handlerName {
 	case "ReadyHandler": //连接成功
@@ -930,6 +948,14 @@ func getHandlerByName(handlerName string) (interface{}, bool) {
 		return C2CMsgRejectHandler(), true
 	case "C2CMsgReceiveHandler": //用户请求开启机器人C2C主动推送
 		return C2CMsgReceiveHandler(), true
+	case "GroupMemberAddEventHandler": //群成员加入
+		return GroupMemberAddEventHandler(), true
+	case "GroupMemberRemoveEventHandler": //群成员退出
+		return GroupMemberRemoveEventHandler(), true
+	case "GroupJoinRequestEventHandler": //用户申请加群
+		return GroupJoinRequestEventHandler(), true
+	case "SubscribeMessageStatusEventHandler": //订阅消息授权状态变更
+		return SubscribeMessageStatusEventHandler(), true
 	default:
 		log.Printf("Unknown handler: %s\n", handlerName)
 		return nil, false
