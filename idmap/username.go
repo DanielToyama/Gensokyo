@@ -1,32 +1,72 @@
 package idmap
 
-import "sync"
+import (
+	"encoding/json"
+	"sync"
+	"time"
 
-// 用户昵称缓存: 官方群事件里携带的 username (如加群申请的申请人昵称) 暂存在内存,
-// 供 get_stranger_info 等需要展示昵称的 onebot action 反查使用。键为官方 openid。
-// 说明: QQ官方机器人API没有"按openid查用户资料"的接口, 因此昵称只能靠事件顺带缓存,
-// 重启后清空, 对应 action 会返回空昵称(回复仍是合法 JSON)。
-var usernameCache sync.Map
+	"go.etcd.io/bbolt"
+)
 
-// StoreUsernameV2 缓存 openid 对应的用户昵称
+// 用户昵称缓存: 官方群事件里携带的 username (如入群申请的申请人昵称、群消息发送者昵称)
+// 持久化到 idmap.db 的 usernames 桶, 缓存 7 天, 重启不丢失。
+// 用途: get_stranger_info 反查 / 出站 at 转 @昵称 文本。
+// 说明: QQ官方机器人API没有"按openid查用户资料"的接口, 昵称只能靠事件顺带缓存;
+// 直接拉进群(无申请事件)的成员可能没有昵称, 会走 @Openid 保底。
+const (
+	usernameBucket = "usernames"
+	usernameTTL    = 7 * 24 * time.Hour
+)
+
+type usernameEntry struct {
+	Username string `json:"username"`
+	StoredAt int64  `json:"stored_at"` // Unix 秒
+}
+
+// StoreUsernameV2 缓存 openid 对应的用户昵称(覆盖旧值并刷新存储时间)
 func StoreUsernameV2(openid, username string) {
 	if openid == "" || username == "" {
 		return
 	}
-	usernameCache.Store(openid, username)
+	entry, _ := json.Marshal(usernameEntry{Username: username, StoredAt: time.Now().Unix()})
+	_ = db.Update(func(tx *bbolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(usernameBucket))
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(openid), entry)
+	})
 }
 
-// RetrieveUsernameByOpenID 读取缓存的用户昵称, 无则返回空串
+// RetrieveUsernameByOpenID 读取缓存的用户昵称; 超过 7 天自动失效并删除, 无则返回空串
 func RetrieveUsernameByOpenID(openid string) string {
 	if openid == "" {
 		return ""
 	}
-	v, ok := usernameCache.Load(openid)
-	if !ok {
-		return ""
-	}
-	s, _ := v.(string)
-	return s
+	var username string
+	now := time.Now().Unix()
+	_ = db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(usernameBucket))
+		if b == nil {
+			return nil
+		}
+		v := b.Get([]byte(openid))
+		if v == nil {
+			return nil
+		}
+		var e usernameEntry
+		if err := json.Unmarshal(v, &e); err != nil {
+			_ = b.Delete([]byte(openid))
+			return nil
+		}
+		if now-e.StoredAt > int64(usernameTTL/time.Second) {
+			_ = b.Delete([]byte(openid))
+			return nil
+		}
+		username = e.Username
+		return nil
+	})
+	return username
 }
 
 // 入群申请缓存: join_request_id -> {group_openid, member_openid}
