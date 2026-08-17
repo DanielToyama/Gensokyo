@@ -1180,16 +1180,15 @@ func RevertTransformedText(data interface{}, msgtype string, api openapi.OpenAPI
 	})
 
 	// [新增] 官方群消息里的表情是 <faceType=1,faceId="264",ext="..."> 内嵌标记(LLOneBot等实现
-	// 会转成 [CQ:face,id=264]), 这里同样转为 CQ 码, 使 raw_message 与其他 OB11 实现行为一致
-	faceRe := regexp.MustCompile(`<faceType=(\d+),faceId="([^"]+)"[^>]*>`)
+	// 会转成 [CQ:face,id=264]), 这里同样转为 CQ 码, 使 raw_message 与其他 OB11 实现行为一致;
+	// 不管 faceType 是几(系统表情/动态表情/贴纸), 一律按 faceId 转成 face
+	faceRe := regexp.MustCompile(`<faceType=\d+,faceId="([^"]+)"[^>]*>`)
 	messageText = faceRe.ReplaceAllStringFunc(messageText, func(m string) string {
 		submatches := faceRe.FindStringSubmatch(m)
-		if len(submatches) > 2 && submatches[1] == "1" {
-			// faceType=1 系统表情 -> [CQ:face,id=xxx]
-			return "[CQ:face,id=" + submatches[2] + "]"
+		if len(submatches) > 1 {
+			return "[CQ:face,id=" + submatches[1] + "]"
 		}
-		// 其他类型(自定义表情等)无标准 CQ 表示, 移除避免把内嵌标记透传出去
-		return ""
+		return m
 	})
 
 	var originmessageText = messageText
@@ -1545,14 +1544,12 @@ func ConvertToSegmentedMessage(data interface{}) []map[string]interface{} {
 		}
 		tag := msg.Content[loc[0]:loc[1]]
 		if strings.HasPrefix(tag, "<faceType=") {
-			// 表情标记: faceType=1 系统表情 -> face 段; 其他类型无标准 CQ 表示, 丢弃
-			if strings.HasPrefix(tag, "<faceType=1") {
-				if fm := faceIdRe.FindStringSubmatch(tag); len(fm) > 1 {
-					messageSegments = append(messageSegments, map[string]interface{}{
-						"type": "face",
-						"data": map[string]interface{}{"id": fm[1]},
-					})
-				}
+			// 表情标记: 不管 faceType 是几, 一律按 faceId 生成 face 段
+			if fm := faceIdRe.FindStringSubmatch(tag); len(fm) > 1 {
+				messageSegments = append(messageSegments, map[string]interface{}{
+					"type": "face",
+					"data": map[string]interface{}{"id": fm[1]},
+				})
 			}
 			cursor = loc[1]
 			continue
