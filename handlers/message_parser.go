@@ -1179,6 +1179,19 @@ func RevertTransformedText(data interface{}, msgtype string, api openapi.OpenAPI
 		return m
 	})
 
+	// [新增] 官方群消息里的表情是 <faceType=1,faceId="264",ext="..."> 内嵌标记(LLOneBot等实现
+	// 会转成 [CQ:face,id=264]), 这里同样转为 CQ 码, 使 raw_message 与其他 OB11 实现行为一致
+	faceRe := regexp.MustCompile(`<faceType=(\d+),faceId="([^"]+)"[^>]*>`)
+	messageText = faceRe.ReplaceAllStringFunc(messageText, func(m string) string {
+		submatches := faceRe.FindStringSubmatch(m)
+		if len(submatches) > 2 && submatches[1] == "1" {
+			// faceType=1 系统表情 -> [CQ:face,id=xxx]
+			return "[CQ:face,id=" + submatches[2] + "]"
+		}
+		// 其他类型(自定义表情等)无标准 CQ 表示, 移除避免把内嵌标记透传出去
+		return ""
+	})
+
 	var originmessageText = messageText
 	//mylog.Printf("2[%v]", messageText)
 
@@ -1517,10 +1530,12 @@ func ConvertToSegmentedMessage(data interface{}) []map[string]interface{} {
 	}
 
 	// [修复] 官方群消息的 @ 是 <@openid>(实测环境; 兼容旧 <@!数字> 与频道 <@!openid>),
-	// 按原文位置切分 content, 生成顺序正确的 text/at 段(符合 onebot v11 消息段规范 array.md)
-	atTagRe := regexp.MustCompile(`<@!?\d+>|<@!?[0-9a-fA-F]{32}>`)
+	// 表情是 <faceType=1,faceId="264",ext="..."> 内嵌标记(LLOneBot 等实现会转成 face 段);
+	// 按原文位置切分 content, 生成顺序正确的 text/at/face 段(符合 onebot v11 消息段规范 array.md)
+	tagRe := regexp.MustCompile(`<@!?\d+>|<@!?[0-9a-fA-F]{32}>|<faceType=\d+,faceId="[^"]+"[^>]*>`)
+	faceIdRe := regexp.MustCompile(`faceId="([^"]+)"`)
 	cursor := 0
-	for _, loc := range atTagRe.FindAllStringIndex(msg.Content, -1) {
+	for _, loc := range tagRe.FindAllStringIndex(msg.Content, -1) {
 		// 标签前的文本
 		if loc[0] > cursor {
 			messageSegments = append(messageSegments, map[string]interface{}{
@@ -1529,6 +1544,19 @@ func ConvertToSegmentedMessage(data interface{}) []map[string]interface{} {
 			})
 		}
 		tag := msg.Content[loc[0]:loc[1]]
+		if strings.HasPrefix(tag, "<faceType=") {
+			// 表情标记: faceType=1 系统表情 -> face 段; 其他类型无标准 CQ 表示, 丢弃
+			if strings.HasPrefix(tag, "<faceType=1") {
+				if fm := faceIdRe.FindStringSubmatch(tag); len(fm) > 1 {
+					messageSegments = append(messageSegments, map[string]interface{}{
+						"type": "face",
+						"data": map[string]interface{}{"id": fm[1]},
+					})
+				}
+			}
+			cursor = loc[1]
+			continue
+		}
 		raw := strings.TrimPrefix(strings.TrimSuffix(tag, ">"), "<@")
 		raw = strings.TrimPrefix(raw, "!")
 		userID := raw
