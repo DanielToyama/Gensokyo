@@ -1,5 +1,19 @@
 
 
+# ⚠️ 本项目已迁移
+
+**本仓库（Gensokyo fork 版）已停止更新，项目已独立迁移至新仓库：**
+
+## 👉 [DanielToyama/Gensokyo-ForSpark](https://github.com/DanielToyama/Gensokyo-ForSpark)
+
+- 后续所有开发、构建与发布都在新仓库进行
+- 本仓库仅保留历史记录，**不再同步更新**
+- 如有问题或反馈，请前往新仓库提交 Issue
+
+> 迁移原因：本项目原为基于 [hoshinonyaruko/gensokyo](https://github.com/hoshinonyaruko/gensokyo) 的 fork，现独立为 **Gensokyo-ForSpark**（针对 SparkBridge 群服互通场景魔改，GPLv3，不再与原上游同步），详情见新仓库 README。
+
+---
+
 > ##  本 Fork 为针对[Sparkbridge-群服互通机器人](https://sparkbridge.cn)使用场景魔改开发版本
 >
 > 基于 [hoshinonyaruko/gensokyo](https://github.com/hoshinonyaruko/gensokyo) 上游分支，为满足群服互通场景需求，在官方代码基础上增加了以下修改（**未合并回官方，基本vibe加小测试，代码可靠性未知，请勿向官方提 PR**）：
